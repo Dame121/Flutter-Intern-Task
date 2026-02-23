@@ -46,7 +46,7 @@ async function getBalance(req, res) {
 async function purchaseCredits(req, res) {
   try {
     const { userId } = req.user;
-    const { amount, packageName } = req.body;
+    const { amount, price } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: 'Invalid amount' });
@@ -55,11 +55,11 @@ async function purchaseCredits(req, res) {
     const transactionId = uuidv4();
 
     // Update balance
-    const result = await db.query(
+    let result = await db.query(
       `UPDATE credits 
        SET balance = balance + $1, updated_at = NOW()
        WHERE user_id = $2
-       RETURNING balance`,
+       RETURNING balance, pre_authorized_amount`,
       [amount, userId]
     );
 
@@ -68,6 +68,10 @@ async function purchaseCredits(req, res) {
       await db.query(
         `INSERT INTO credits (user_id, balance) VALUES ($1, $2)`,
         [userId, amount]
+      );
+      result = await db.query(
+        `SELECT balance, pre_authorized_amount FROM credits WHERE user_id = $1`,
+        [userId]
       );
     }
 
@@ -78,12 +82,12 @@ async function purchaseCredits(req, res) {
       [transactionId, userId, amount]
     );
 
+    const { balance, pre_authorized_amount } = result.rows[0];
     res.json({
+      balance: parseFloat(balance),
+      preAuthorizedAmount: parseFloat(pre_authorized_amount),
       message: 'Credits purchased successfully',
       transactionId,
-      amount,
-      packageName,
-      newBalance: result.rows[0]?.balance || amount,
     });
   } catch (error) {
     console.error('Purchase credits error:', error);
@@ -319,15 +323,15 @@ async function getTransactionHistory(req, res) {
       [userId]
     );
 
-    res.json({
-      transactions: result.rows.map(tx => ({
+    res.json(
+      result.rows.map(tx => ({
         id: tx.id,
         type: tx.type,
         amount: parseFloat(tx.amount),
-        otherUserId: tx.other_user_id,
         createdAt: tx.created_at,
-      })),
-    });
+        description: `${tx.type}: $${parseFloat(tx.amount).toFixed(2)}`,
+      }))
+    );
   } catch (error) {
     console.error('Get history error:', error);
     res.status(500).json({ message: 'Failed to get history', error: error.message });

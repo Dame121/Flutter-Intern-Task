@@ -17,6 +17,12 @@ import 'package:caller_host_app/features/discovery/data/repositories/discovery_r
 import 'package:caller_host_app/features/discovery/domain/repositories/discovery_repository.dart';
 import 'package:caller_host_app/features/discovery/presentation/bloc/discovery_bloc.dart';
 import 'package:caller_host_app/features/discovery/presentation/pages/discovery_page.dart';
+import 'package:caller_host_app/features/billing/data/datasources/billing_remote_datasource.dart';
+import 'package:caller_host_app/features/billing/data/repositories/billing_repository_impl.dart';
+import 'package:caller_host_app/features/billing/domain/repositories/billing_repository.dart';
+import 'package:caller_host_app/features/billing/presentation/bloc/billing_bloc.dart';
+import 'package:caller_host_app/features/billing/presentation/pages/credit_purchase_page.dart';
+import 'package:caller_host_app/features/billing/presentation/widgets/balance_display_widget.dart';
 
 final getIt = GetIt.instance;
 
@@ -56,6 +62,18 @@ Future<void> setupDependencies() async {
     ),
   );
 
+  // Register Billing Data Sources
+  getIt.registerSingleton<BillingRemoteDataSource>(
+    BillingRemoteDataSourceImpl(getIt<ApiClient>()),
+  );
+
+  // Register Billing Repositories
+  getIt.registerSingleton<BillingRepository>(
+    BillingRepositoryImpl(
+      remoteDataSource: getIt<BillingRemoteDataSource>(),
+    ),
+  );
+
   // Register Blocs
   getIt.registerSingleton<AuthBloc>(
     AuthBloc(
@@ -67,6 +85,12 @@ Future<void> setupDependencies() async {
   getIt.registerSingleton<DiscoveryBloc>(
     DiscoveryBloc(
       repository: getIt<DiscoveryRepository>(),
+    ),
+  );
+
+  getIt.registerSingleton<BillingBloc>(
+    BillingBloc(
+      repository: getIt<BillingRepository>(),
     ),
   );
 }
@@ -140,19 +164,46 @@ class AppHome extends StatelessWidget {
     if (state.user.role == 'caller') {
       return BlocProvider<DiscoveryBloc>(
         create: (context) => getIt<DiscoveryBloc>(),
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('Find a Host'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.account_circle),
-                onPressed: () {
-                  _showProfileMenu(context, state);
-                },
-              ),
-            ],
+        child: BlocProvider<BillingBloc>(
+          create: (context) => getIt<BillingBloc>(),
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Find a Host'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.add_card),
+                  tooltip: 'Buy Credits',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CreditPurchasePage(),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.account_circle),
+                  onPressed: () {
+                    _showProfileMenu(context, state);
+                  },
+                ),
+              ],
+            ),
+            body: Column(
+              children: [
+                // Balance display
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: BalanceDisplayWidget(),
+                ),
+                // Discovery page
+                const Expanded(
+                  child: DiscoveryPage(),
+                ),
+              ],
+            ),
           ),
-          body: const DiscoveryPage(),
         ),
       );
     }
