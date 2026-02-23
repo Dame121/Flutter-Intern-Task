@@ -12,6 +12,11 @@ import 'package:caller_host_app/features/auth/domain/repositories/auth_repositor
 import 'package:caller_host_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:caller_host_app/features/auth/presentation/bloc/auth_event.dart';
 import 'package:caller_host_app/features/auth/presentation/bloc/auth_state.dart';
+import 'package:caller_host_app/features/discovery/data/datasources/discovery_remote_datasource.dart';
+import 'package:caller_host_app/features/discovery/data/repositories/discovery_repository_impl.dart';
+import 'package:caller_host_app/features/discovery/domain/repositories/discovery_repository.dart';
+import 'package:caller_host_app/features/discovery/presentation/bloc/discovery_bloc.dart';
+import 'package:caller_host_app/features/discovery/presentation/pages/discovery_page.dart';
 
 final getIt = GetIt.instance;
 
@@ -39,11 +44,29 @@ Future<void> setupDependencies() async {
     ),
   );
   
+  // Register Discovery Data Sources
+  getIt.registerSingleton<DiscoveryRemoteDataSource>(
+    DiscoveryRemoteDataSourceImpl(getIt<ApiClient>()),
+  );
+
+  // Register Discovery Repositories
+  getIt.registerSingleton<DiscoveryRepository>(
+    DiscoveryRepositoryImpl(
+      remoteDataSource: getIt<DiscoveryRemoteDataSource>(),
+    ),
+  );
+
   // Register Blocs
   getIt.registerSingleton<AuthBloc>(
     AuthBloc(
       authRepository: getIt<AuthRepository>(),
       secureStorage: secureStorage,
+    ),
+  );
+
+  getIt.registerSingleton<DiscoveryBloc>(
+    DiscoveryBloc(
+      repository: getIt<DiscoveryRepository>(),
     ),
   );
 }
@@ -113,14 +136,36 @@ class AppHome extends StatelessWidget {
   }
   
   Widget _buildHomeScreen(BuildContext context, AuthSuccessState state) {
+    // Caller can browse hosts
+    if (state.user.role == 'caller') {
+      return BlocProvider<DiscoveryBloc>(
+        create: (context) => getIt<DiscoveryBloc>(),
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Find a Host'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.account_circle),
+                onPressed: () {
+                  _showProfileMenu(context, state);
+                },
+              ),
+            ],
+          ),
+          body: const DiscoveryPage(),
+        ),
+      );
+    }
+    
+    // Host dashboard
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Home'),
+        title: const Text('Host Dashboard'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.account_circle),
             onPressed: () {
-              context.read<AuthBloc>().add(const LogoutEvent());
+              _showProfileMenu(context, state);
             },
           ),
         ],
@@ -129,14 +174,42 @@ class AppHome extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Welcome, ${state.user.displayName}!'),
-            Text('Role: ${state.user.role}'),
+            Text('Welcome, Host ${state.user.displayName}!'),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
+            const Text('Host features coming soon...'),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  void _showProfileMenu(BuildContext context, AuthSuccessState state) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(state.user.displayName),
+              subtitle: Text(state.user.role.toUpperCase()),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: () {
+                Navigator.pop(context);
                 context.read<AuthBloc>().add(const LogoutEvent());
               },
-              child: const Text('Logout'),
             ),
           ],
         ),

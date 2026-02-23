@@ -13,12 +13,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 // Service URLs
 const SERVICES = {
   auth: process.env.AUTH_SERVICE_URL || 'http://auth-service:3000',
-  user: process.env.USER_SERVICE_URL || 'http://user-service:3000',
-  discovery: process.env.DISCOVERY_SERVICE_URL || 'http://discovery-service:3000',
-  chat: process.env.CHAT_SERVICE_URL || 'http://chat-service:3000',
-  call: process.env.CALL_SERVICE_URL || 'http://call-service:3000',
-  billing: process.env.BILLING_SERVICE_URL || 'http://billing-service:3000',
-  notification: process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3000',
+  user: process.env.USER_SERVICE_URL || 'http://user-service:3001',
+  discovery: process.env.DISCOVERY_SERVICE_URL || 'http://discovery-service:3002',
+  chat: process.env.CHAT_SERVICE_URL || 'http://chat-service:3003',
+  call: process.env.CALL_SERVICE_URL || 'http://call-service:3004',
+  billing: process.env.BILLING_SERVICE_URL || 'http://billing-service:3005',
+  notification: process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3006',
 };
 
 // Middleware
