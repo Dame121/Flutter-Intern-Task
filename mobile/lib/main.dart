@@ -23,6 +23,11 @@ import 'package:caller_host_app/features/billing/domain/repositories/billing_rep
 import 'package:caller_host_app/features/billing/presentation/bloc/billing_bloc.dart';
 import 'package:caller_host_app/features/billing/presentation/pages/credit_purchase_page.dart';
 import 'package:caller_host_app/features/billing/presentation/widgets/balance_display_widget.dart';
+import 'package:caller_host_app/features/chat/data/datasources/chat_remote_datasource.dart';
+import 'package:caller_host_app/features/chat/data/repositories/chat_repository_impl.dart';
+import 'package:caller_host_app/features/chat/domain/repositories/chat_repository.dart';
+import 'package:caller_host_app/features/chat/presentation/bloc/chat_bloc.dart';
+import 'package:caller_host_app/features/chat/presentation/pages/chat_page.dart';
 
 final getIt = GetIt.instance;
 
@@ -74,6 +79,18 @@ Future<void> setupDependencies() async {
     ),
   );
 
+  // Register Chat Data Sources
+  getIt.registerSingleton<ChatRemoteDataSource>(
+    ChatRemoteDataSourceImpl(getIt<ApiClient>()),
+  );
+
+  // Register Chat Repositories
+  getIt.registerSingleton<ChatRepository>(
+    ChatRepositoryImpl(
+      remoteDataSource: getIt<ChatRemoteDataSource>(),
+    ),
+  );
+
   // Register Blocs
   getIt.registerSingleton<AuthBloc>(
     AuthBloc(
@@ -91,6 +108,12 @@ Future<void> setupDependencies() async {
   getIt.registerSingleton<BillingBloc>(
     BillingBloc(
       repository: getIt<BillingRepository>(),
+    ),
+  );
+
+  getIt.registerSingleton<ChatBloc>(
+    ChatBloc(
+      repository: getIt<ChatRepository>(),
     ),
   );
 }
@@ -160,49 +183,15 @@ class AppHome extends StatelessWidget {
   }
   
   Widget _buildHomeScreen(BuildContext context, AuthSuccessState state) {
-    // Caller can browse hosts
+    // Caller can browse hosts and message
     if (state.user.role == 'caller') {
       return BlocProvider<DiscoveryBloc>(
         create: (context) => getIt<DiscoveryBloc>(),
         child: BlocProvider<BillingBloc>(
           create: (context) => getIt<BillingBloc>(),
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Find a Host'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.add_card),
-                  tooltip: 'Buy Credits',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CreditPurchasePage(),
-                      ),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.account_circle),
-                  onPressed: () {
-                    _showProfileMenu(context, state);
-                  },
-                ),
-              ],
-            ),
-            body: Column(
-              children: [
-                // Balance display
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: BalanceDisplayWidget(),
-                ),
-                // Discovery page
-                const Expanded(
-                  child: DiscoveryPage(),
-                ),
-              ],
-            ),
+          child: BlocProvider<ChatBloc>(
+            create: (context) => getIt<ChatBloc>(),
+            child: const CallerHomeScreen(),
           ),
         ),
       );
@@ -233,43 +222,148 @@ class AppHome extends StatelessWidget {
       ),
     );
   }
-  
-  void _showProfileMenu(BuildContext context, AuthSuccessState state) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text(state.user.displayName),
-              subtitle: Text(state.user.role.toUpperCase()),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('Profile'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: () {
-                Navigator.pop(context);
-                context.read<AuthBloc>().add(const LogoutEvent());
-              },
-            ),
-          ],
-        ),
+}
+
+class CallerHomeScreen extends StatefulWidget {
+  const CallerHomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<CallerHomeScreen> createState() => _CallerHomeScreenState();
+}
+
+class _CallerHomeScreenState extends State<CallerHomeScreen> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _screens = [
+    const _DiscoveryTab(),
+    const _ChatTab(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _screens[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Find Hosts',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
+        ],
       ),
     );
   }
 }
 
-class LoginScreen extends StatefulWidget {
+class _DiscoveryTab extends StatelessWidget {
+  const _DiscoveryTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Find a Host'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_card),
+            tooltip: 'Buy Credits',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CreditPurchasePage(),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_circle),
+            onPressed: () {
+              // Get auth state from context
+              final authState = context.read<AuthBloc>().state;
+              if (authState is AuthSuccessState) {
+                _showProfileMenu(context, authState);
+              }
+            },
+          ),
+        ],
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          // Balance display
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: BlocProvider.value(
+              value: context.read<BillingBloc>(),
+              child: const BalanceDisplayWidget(),
+            ),
+          ),
+          // Discovery page
+          const Expanded(
+            child: DiscoveryPage(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatTab extends StatelessWidget {
+  const _ChatTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider.value(
+      value: context.read<ChatBloc>(),
+      child: const ChatPage(),
+    );
+  }
+}
+
+void _showProfileMenu(BuildContext context, AuthSuccessState state) {
+  showModalBottomSheet(
+    context: context,
+    builder: (context) => Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            title: Text(state.user.displayName),
+            subtitle: Text(state.user.role.toUpperCase()),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.person),
+            title: const Text('Profile'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Logout'),
+            onTap: () {
+              Navigator.pop(context);
+              context.read<AuthBloc>().add(const LogoutEvent());
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
   const LoginScreen({Key? key}) : super(key: key);
   
   @override
