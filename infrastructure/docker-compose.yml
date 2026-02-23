@@ -1,0 +1,249 @@
+version: '3.9'
+
+services:
+  # Databases
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  mongodb:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  # Message Queue
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_ENABLE_RACK_AWARENESS: "false"
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - backend
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - backend
+
+  # Microservices
+  auth-service:
+    build:
+      context: ./backend/auth-service
+    container_name: auth-service
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: auth_service
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-super-secret-refresh-key}
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+
+  user-service:
+    image: node:18-alpine
+    container_name: user-service
+    ports:
+      - "3001:3000"
+    environment:
+      PORT: 3000
+      MONGO_URI: mongodb://admin:admin@mongodb:27017/user_service
+      NODE_ENV: development
+    command: echo "User Service - Placeholder (to be implemented)"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+
+  discovery-service:
+    image: node:18-alpine
+    container_name: discovery-service
+    ports:
+      - "3002:3000"
+    environment:
+      PORT: 3000
+      MONGO_URI: mongodb://admin:admin@mongodb:27017/discovery_service
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+    command: echo "Discovery Service - Placeholder (to be implemented)"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+
+  chat-service:
+    image: node:18-alpine
+    container_name: chat-service
+    ports:
+      - "3003:3000"
+    environment:
+      PORT: 3000
+      MONGO_URI: mongodb://admin:admin@mongodb:27017/chat_service
+      NODE_ENV: development
+    command: echo "Chat Service - Placeholder (to be implemented)"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+
+  call-service:
+    image: node:18-alpine
+    container_name: call-service
+    ports:
+      - "3004:3000"
+    environment:
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      AGORA_APP_ID: ${AGORA_APP_ID:-YOUR_AGORA_APP_ID}
+      NODE_ENV: development
+    command: echo "Call Service - Placeholder (to be implemented)"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+
+  billing-service:
+    image: node:18-alpine
+    container_name: billing-service
+    ports:
+      - "3005:3000"
+    environment:
+      PORT: 3000
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: billing_service
+      KAFKA_BROKER: kafka:29092
+      NODE_ENV: development
+    command: echo "Billing Service - Placeholder (to be implemented)"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - backend
+    restart: unless-stopped
+
+  notification-service:
+    image: node:18-alpine
+    container_name: notification-service
+    ports:
+      - "3006:3000"
+    environment:
+      PORT: 3000
+      MONGO_URI: mongodb://admin:admin@mongodb:27017/notification_service
+      FCM_KEY: ${FCM_KEY:-YOUR_FCM_KEY}
+      NODE_ENV: development
+    command: echo "Notification Service - Placeholder (to be implemented)"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+
+  api-gateway:
+    image: node:18-alpine
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      AUTH_SERVICE_URL: http://auth-service:3000
+      USER_SERVICE_URL: http://user-service:3000
+      DISCOVERY_SERVICE_URL: http://discovery-service:3000
+      CHAT_SERVICE_URL: http://chat-service:3000
+      CALL_SERVICE_URL: http://call-service:3000
+      BILLING_SERVICE_URL: http://billing-service:3000
+      NOTIFICATION_SERVICE_URL: http://notification-service:3000
+      NODE_ENV: development
+    command: echo "API Gateway - Placeholder (to be implemented)"
+    depends_on:
+      - auth-service
+    networks:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+
+networks:
+  backend:
+    driver: bridge

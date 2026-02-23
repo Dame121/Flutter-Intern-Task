@@ -1,0 +1,50 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.apk
+*.ipa
+*.app
+*.appbundle
+
+# Flutter web
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+
+# Misc
+.DS_Store
+*.log
+.env
+.env.local
+*.iml
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Generated files
+*.g.dart
+*.config.dart
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+
+# Database
+*.sqlite
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+Thumbs.db
