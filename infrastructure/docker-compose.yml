@@ -104,7 +104,8 @@ services:
     restart: unless-stopped
 
   user-service:
-    image: node:18-alpine
+    build:
+      context: ./backend/user-service
     container_name: user-service
     ports:
       - "3001:3000"
@@ -112,7 +113,6 @@ services:
       PORT: 3000
       MONGO_URI: mongodb://admin:admin@mongodb:27017/user_service
       NODE_ENV: development
-    command: echo "User Service - Placeholder (to be implemented)"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -121,7 +121,8 @@ services:
     restart: unless-stopped
 
   discovery-service:
-    image: node:18-alpine
+    build:
+      context: ./backend/discovery-service
     container_name: discovery-service
     ports:
       - "3002:3000"
@@ -130,7 +131,6 @@ services:
       MONGO_URI: mongodb://admin:admin@mongodb:27017/discovery_service
       REDIS_URL: redis://redis:6379
       NODE_ENV: development
-    command: echo "Discovery Service - Placeholder (to be implemented)"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -141,7 +141,8 @@ services:
     restart: unless-stopped
 
   chat-service:
-    image: node:18-alpine
+    build:
+      context: ./backend/chat-service
     container_name: chat-service
     ports:
       - "3003:3000"
@@ -149,7 +150,6 @@ services:
       PORT: 3000
       MONGO_URI: mongodb://admin:admin@mongodb:27017/chat_service
       NODE_ENV: development
-    command: echo "Chat Service - Placeholder (to be implemented)"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -158,7 +158,8 @@ services:
     restart: unless-stopped
 
   call-service:
-    image: node:18-alpine
+    build:
+      context: ./backend/call-service
     container_name: call-service
     ports:
       - "3004:3000"
@@ -167,7 +168,6 @@ services:
       REDIS_URL: redis://redis:6379
       AGORA_APP_ID: ${AGORA_APP_ID:-YOUR_AGORA_APP_ID}
       NODE_ENV: development
-    command: echo "Call Service - Placeholder (to be implemented)"
     depends_on:
       redis:
         condition: service_healthy
@@ -176,7 +176,8 @@ services:
     restart: unless-stopped
 
   billing-service:
-    image: node:18-alpine
+    build:
+      context: ./backend/billing-service
     container_name: billing-service
     ports:
       - "3005:3000"
@@ -189,7 +190,6 @@ services:
       DB_NAME: billing_service
       KAFKA_BROKER: kafka:29092
       NODE_ENV: development
-    command: echo "Billing Service - Placeholder (to be implemented)"
     depends_on:
       postgres:
         condition: service_healthy
@@ -200,7 +200,8 @@ services:
     restart: unless-stopped
 
   notification-service:
-    image: node:18-alpine
+    build:
+      context: ./backend/notification-service
     container_name: notification-service
     ports:
       - "3006:3000"
@@ -209,7 +210,6 @@ services:
       MONGO_URI: mongodb://admin:admin@mongodb:27017/notification_service
       FCM_KEY: ${FCM_KEY:-YOUR_FCM_KEY}
       NODE_ENV: development
-    command: echo "Notification Service - Placeholder (to be implemented)"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -218,7 +218,8 @@ services:
     restart: unless-stopped
 
   api-gateway:
-    image: node:18-alpine
+    build:
+      context: ./backend/api-gateway
     container_name: api-gateway
     ports:
       - "8000:8000"
@@ -232,7 +233,6 @@ services:
       BILLING_SERVICE_URL: http://billing-service:3000
       NOTIFICATION_SERVICE_URL: http://notification-service:3000
       NODE_ENV: development
-    command: echo "API Gateway - Placeholder (to be implemented)"
     depends_on:
       - auth-service
     networks:
